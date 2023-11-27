@@ -1,1 +1,6 @@
 infra/besu
+infra/besu/node1/caches/logBloom-0.cache
+infra/besu/node2/caches/logBloom-0.cache
+infra/besu/node3/caches/logBloom-0.cache
+infra/besu/node4/caches/logBloom-0.cache
+
