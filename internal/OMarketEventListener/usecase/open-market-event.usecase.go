@@ -39,24 +39,7 @@ func (uc *EventUseCase) ProcessSecondarySold() {
 		defer uc.recoverFromError("ProcessSecondarySold")
 
 		ctx := context.Background()
-		currentBlock, err := uc.repo.GetCurrentBlockNumber()
-		if err != nil {
-			log.Printf("Error getting current block number: %v", err)
-			return
-		}
-		log.Printf("currentBlock %v", currentBlock)
-
-		events, err := uc.repo.ListenSecondarySold(ctx, currentBlock)
-		if err != nil {
-			log.Printf("Error in ProcessSecondarySold: %v", err)
-			time.Sleep(time.Second * 10)
-			uc.ProcessSecondarySold()
-			return
-		}
-
-		for event := range events {
-			log.Printf("SecondarySold event received: %+v", event)
-		}
+		uc.repo.ListenSecondarySold(ctx)
 	}()
 }
 
@@ -65,26 +48,8 @@ func (uc *EventUseCase) ProcessSecondaryForSale() {
 		defer uc.recoverFromError("ProcessSecondaryForSale")
 
 		ctx := context.Background()
-		currentBlock, err := uc.repo.GetCurrentBlockNumber()
-		println(currentBlock)
-		if err != nil {
-			log.Printf("Error getting current block number: %v", err)
-			return
-		}
 
-		log.Printf("currentBlock %v", currentBlock)
-
-		events, err := uc.repo.ListenSecondaryForSale(ctx, currentBlock)
-		if err != nil {
-			log.Printf("Error in ProcessSecondaryForSale: %v", err)
-			time.Sleep(time.Second * 10)
-			uc.ProcessSecondaryForSale()
-			return
-		}
-
-		for event := range events {
-			log.Printf("Secondary For Sale event received: %+v", event)
-		}
+		uc.repo.ListenSecondaryForSale(ctx)
 	}()
 }
 

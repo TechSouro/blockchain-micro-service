@@ -23,9 +23,9 @@ func InitEventSystem() {
 
 	// Initialize events
 	go eventUseCase.ProcessPublicOrderCreated()
-	// go eventUseCase.ProcessPrimarySale()
-	// go eventUseCase.ProcessSecondaryForSale()
-	// go eventUseCase.ProcessSecondarySold()
+	go eventUseCase.ProcessPrimarySale()
+	go eventUseCase.ProcessSecondaryForSale()
+	go eventUseCase.ProcessSecondarySold()
 
 	log.Println("Event system initialized and listening for events")
 }
