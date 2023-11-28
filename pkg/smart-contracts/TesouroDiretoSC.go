@@ -1958,3 +1958,4 @@ func (_TesouroDireto *TesouroDiretoFilterer) ParseTreasuryCreated(log types.Log)
 	event.Raw = log
 	return event, nil
 }
+

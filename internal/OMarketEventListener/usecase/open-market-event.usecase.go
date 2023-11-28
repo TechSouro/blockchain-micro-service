@@ -20,14 +20,8 @@ func NewEventUseCase(repo *repository.ContractRepository) *EventUseCase {
 func (uc *EventUseCase) ProcessPublicOrderCreated() {
 	go func() {
 		defer uc.recoverFromError("ProcessPublicOrderCreated")
-
-		currentBlock, err := uc.repo.GetCurrentBlockNumber()
-		if err != nil {
-			log.Printf("Error getting current block number: %v", err)
-			return
-		}
-
-		uc.repo.ListenToPublicOrderCreated(currentBlock)
+		ctx := context.Background()
+		uc.repo.ListenToPublicOrderCreated(ctx)
 	}()
 }
 
@@ -36,23 +30,7 @@ func (uc *EventUseCase) ProcessPrimarySale() {
 		defer uc.recoverFromError("ProcessPrimarySale")
 
 		ctx := context.Background()
-		currentBlock, err := uc.repo.GetCurrentBlockNumber()
-		if err != nil {
-			log.Printf("Error getting current block number: %v", err)
-			return
-		}
-
-		events, err := uc.repo.ListenToPrimarySale(ctx, currentBlock)
-		if err != nil {
-			log.Printf("Error in ProcessPrimarySale: %v", err)
-			time.Sleep(time.Second * 10)
-			uc.ProcessPrimarySale()
-			return
-		}
-
-		for event := range events {
-			log.Printf("Primary Sale event: %+v\n", event)
-		}
+		uc.repo.ListenToPrimarySale(ctx)
 	}()
 }
 
@@ -66,6 +44,7 @@ func (uc *EventUseCase) ProcessSecondarySold() {
 			log.Printf("Error getting current block number: %v", err)
 			return
 		}
+		log.Printf("currentBlock %v", currentBlock)
 
 		events, err := uc.repo.ListenSecondarySold(ctx, currentBlock)
 		if err != nil {
@@ -87,10 +66,13 @@ func (uc *EventUseCase) ProcessSecondaryForSale() {
 
 		ctx := context.Background()
 		currentBlock, err := uc.repo.GetCurrentBlockNumber()
+		println(currentBlock)
 		if err != nil {
 			log.Printf("Error getting current block number: %v", err)
 			return
 		}
+
+		log.Printf("currentBlock %v", currentBlock)
 
 		events, err := uc.repo.ListenSecondaryForSale(ctx, currentBlock)
 		if err != nil {
@@ -117,7 +99,8 @@ func (uc *EventUseCase) recoverFromError(processName string) {
 			uc.ProcessPrimarySale()
 		case "ProcessSecondarySold":
 			uc.ProcessSecondarySold()
-
+		case "ProcessSecondaryForSale":
+			uc.ProcessSecondaryForSale()
 		}
 	}
 }

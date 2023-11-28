@@ -3,9 +3,11 @@ package OMarketEventListener
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"math/big"
 	pkg "service/pkg/smart-contracts"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -49,54 +51,125 @@ func (cr *ContractRepository) GetCurrentBlockNumber() (uint64, error) {
 	return header.Number.Uint64(), nil
 }
 
-func (cr *ContractRepository) ListenToPublicOrderCreated(startBlock uint64) {
-	opts := &bind.FilterOpts{Start: startBlock, End: nil, Context: context.Background()}
-	it, err := cr.contract.FilterPublicOrderCreated(opts, nil)
-	if err != nil {
-		log.Fatalf("Failed to filter event logs: %v", err)
-	}
-
-	for it.Next() {
-		event := it.Event
-		log.Printf("PublicOrderCreated event received: TokenID=%d", event.TokenId)
-	}
-	if it.Error() != nil {
-		log.Fatalf("Iterator error: %v", it.Error())
-	}
+func formatPublicOrderCreatedEvent(event *pkg.OpenMarketPublicOrderCreated) string {
+	// Formatação básica da saída do evento
+	return fmt.Sprintf(
+		"Public Order Created Event:\n"+
+			"    Token ID: %d\n"+
+			"    Transaction Hash: %s\n"+
+			"    Block Number: %d\n"+
+			"    Block Hash: %s\n"+
+			"    Event Index: %d\n",
+		event.TokenId,
+		event.Raw.TxHash.Hex(),
+		event.Raw.BlockNumber,
+		event.Raw.BlockHash.Hex(),
+		event.Raw.Index,
+	)
 }
 
-func (cr *ContractRepository) ListenToPrimarySale(ctx context.Context, startBlock uint64) (<-chan *pkg.OpenMarketPrimarySale, error) {
-	events := make(chan *pkg.OpenMarketPrimarySale)
-
+func (cr *ContractRepository) ListenToPublicOrderCreated(ctx context.Context) {
 	go func() {
-		defer close(events)
-
-		opts := &bind.FilterOpts{
-			Start:   startBlock,
-			End:     nil,
-			Context: ctx,
-		}
-
-		it, err := cr.contract.FilterPrimarySale(opts, nil, nil, nil)
-		if err != nil {
-			log.Printf("Failed to filter event logs: %v", err)
-			return
-		}
-
-		for it.Next() {
-			select {
-			case <-ctx.Done():
-				return
-			case events <- it.Event:
+		for {
+			currentBlock, err := cr.GetCurrentBlockNumber()
+			if err != nil {
+				log.Printf("Error getting current block number: %v", err)
+				time.Sleep(time.Second * 10)
+				continue
 			}
-		}
 
-		if it.Error() != nil {
-			log.Printf("Iterator error: %v", it.Error())
+			log.Printf("Current Block: %v", currentBlock)
+
+			opts := &bind.WatchOpts{Start: &currentBlock, Context: ctx}
+			events := make(chan *pkg.OpenMarketPublicOrderCreated)
+			var tokenIdFilter []*big.Int
+
+			sub, err := cr.contract.WatchPublicOrderCreated(opts, events, tokenIdFilter)
+			if err != nil {
+				log.Printf("Failed to watch event logs: %v", err)
+				time.Sleep(time.Second * 5)
+				continue
+			}
+
+			for {
+				select {
+				case event := <-events:
+					formattedEvent := formatPublicOrderCreatedEvent(event)
+					log.Println(formattedEvent)
+				case err := <-sub.Err():
+					log.Printf("Subscription error: %v", err)
+					break
+				case <-ctx.Done():
+					return
+				}
+			}
+
+			sub.Unsubscribe()
+			time.Sleep(time.Second * 5)
 		}
 	}()
+}
 
-	return events, nil
+func formatPrimarySaleEvent(event *pkg.OpenMarketPrimarySale) string {
+	return fmt.Sprintf(
+		"Primary Sale Event:\n"+
+			"\tSender: %s\n"+
+			"\tToken ID: %d\n"+
+			"\tAmount: %d\n"+
+			"\tTransaction Hash: %s\n"+
+			"\tBlock Number: %d\n",
+		event.Sender.Hex(),     // Converte o endereço para string
+		event.TokenId,          // ID do token
+		event.Amount,           // Quantidade
+		event.Raw.TxHash.Hex(), // Hash da transação
+		event.Raw.BlockNumber,  // Número do bloco
+	)
+}
+func (cr *ContractRepository) ListenToPrimarySale(ctx context.Context) {
+	go func() {
+		for {
+			currentBlock, err := cr.GetCurrentBlockNumber()
+			if err != nil {
+				log.Printf("Error getting current block number: %v", err)
+				time.Sleep(time.Second * 10)
+				continue
+			}
+
+			log.Printf("Current Block: %v", currentBlock)
+
+			// Channel go to receive events
+			events := make(chan *pkg.OpenMarketPrimarySale)
+			opts := &bind.WatchOpts{Start: &currentBlock, Context: ctx}
+
+			// Filters
+			var senderFilter []common.Address
+			var tokenIdFilter []*big.Int
+			var amountFilter []*big.Int
+
+			// Init Observer
+			sub, err := cr.contract.WatchPrimarySale(opts, events, senderFilter, tokenIdFilter, amountFilter)
+			if err != nil {
+				log.Printf("Failed to start watching event logs: %v", err)
+				time.Sleep(time.Second * 5)
+				continue
+			}
+
+			// Process Events
+			for {
+				select {
+				case event := <-events:
+					formattedEvent := formatPrimarySaleEvent(event)
+					log.Println(formattedEvent)
+				case err := <-sub.Err():
+					log.Printf("Subscription error: %v", err)
+					break
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				}
+			}
+		}
+	}()
 }
 
 func (cr *ContractRepository) ListenSecondaryForSale(ctx context.Context, startBlock uint64) (<-chan *pkg.OpenMarketSecondaryForSale, error) {

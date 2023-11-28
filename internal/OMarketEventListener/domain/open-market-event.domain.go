@@ -4,7 +4,11 @@ import "github.com/ethereum/go-ethereum/common"
 
 /**
 * @dev soldity events signature
-* event publicOrderCreated(uint256 indexed _tokenId,uint256 indexed _price, uint256 indexed _available);
+* event publicOrderCreated(
+		uint256 indexed _tokenId,
+		uint256 indexed _price,
+		uint256 indexed _available
+);
 	event primarySale(address indexed _sender, uint256 indexed _tokenId, uint256 indexed _amount);
 	event secondaryForSale(
 		address indexed _seller,
