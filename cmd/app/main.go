@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"log"
+	service "service/config"
 )
 
 func main() {
 	log.Println("Starting blockchain monitor...")
 
-	// Inicializar o processador de eventos
+	service.InitEventSystem()
 
 	<-context.Background().Done()
 }
