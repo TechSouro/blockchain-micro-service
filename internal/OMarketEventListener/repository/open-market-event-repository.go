@@ -58,9 +58,11 @@ func formatPublicOrderCreatedEvent(event *pkg.OpenMarketPublicOrderCreated) stri
 	yellow := color.New(color.FgYellow).SprintFunc()
 
 	return fmt.Sprintf(
-		"%s\n\t%s %d\n\t%s %s\n\t%s %d\n\t%s %s\n\t%s %d\n",
+		"%s\n\t %s %d\n %s %d\n %s %s\n \t%s %s\n \t%s %d\n \t%s %s\n \t%s %d\n",
 		black("Public Order Created Event:"),
-		yellow("Token ID:"), event.TokenId,
+		yellow("Token ID: "), event.TokenId,
+		yellow("Units: "), event.Units,
+		yellow("Price: "), formatBigInt(event.Price),
 		yellow("Transaction Hash:"), event.Raw.TxHash.Hex(),
 		yellow("Block Number:"), event.Raw.BlockNumber,
 		yellow("Block Hash:"), event.Raw.BlockHash.Hex(),
@@ -82,9 +84,11 @@ func (cr *ContractRepository) ListenToPublicOrderCreated(ctx context.Context) {
 
 			opts := &bind.WatchOpts{Start: &currentBlock, Context: ctx}
 			events := make(chan *pkg.OpenMarketPublicOrderCreated)
-			var tokenIdFilter []*big.Int
 
-			sub, err := cr.contract.WatchPublicOrderCreated(opts, events, tokenIdFilter)
+			var tokenId []*big.Int
+			var units []*big.Int
+
+			sub, err := cr.contract.WatchPublicOrderCreated(opts, events, tokenId, units)
 			if err != nil {
 				log.Printf("Failed to watch event logs: %v", err)
 				time.Sleep(time.Second * 5)

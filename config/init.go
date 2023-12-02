@@ -11,7 +11,7 @@ import (
 func InitEventSystem() {
 	// Ethereum client
 	clientURL := "ws://127.0.01:6175"
-	contractAddr := common.HexToAddress("0x645576876B788538e2E88A910c6aF76De5467C1f")
+	contractAddr := common.HexToAddress("0xAdDBA9A148680AA3d00dDcF31CFa3Ec9226de100")
 
 	// Instanciate repository
 	repo, err := OMarketEventListenerRepository.NewContractRepository(clientURL, contractAddr)

@@ -362,6 +362,18 @@
           "internalType": "uint256",
           "name": "_tokenId",
           "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "_units",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "_price",
+          "type": "uint256"
         }
       ],
       "name": "publicOrderCreated",
