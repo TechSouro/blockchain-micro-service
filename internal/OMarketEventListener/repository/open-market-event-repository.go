@@ -43,15 +43,15 @@ type PrimarySale struct {
 
 type SecondaryForSale struct {
 	TokenID uint64
-	Seller  string // Altere o tipo para o que você usa para representar endereços Ethereum
+	Seller  string
 	Units   uint64
 	Price   *big.Int
 }
 
 type SecondarySold struct {
 	TokenID uint64
-	Seller  string // Altere o tipo para o que você usa para representar endereços Ethereum
-	Buyer   string // Altere o tipo para o que você usa para representar endereços Ethereum
+	Seller  string
+	Buyer   string
 	Units   uint64
 	Price   uint64
 }
@@ -161,7 +161,6 @@ func (cr *ContractRepository) ListenToPublicOrderCreated(ctx context.Context) {
 					tokenID := bigIntToUint64(event.TokenId)
 					unitsAvailable := bigIntToUint64(event.Units)
 
-					// Adicionar à primeira tabela
 					cr.AddToPrimaryTable(ctx, PublicOrderCreated{
 						TokenID:   tokenID,
 						Available: unitsAvailable,
@@ -302,7 +301,7 @@ func (cr *ContractRepository) ListenSecondaryForSale(ctx context.Context) {
 					fmt.Println(formattedEvent)
 
 					tokenID := bigIntToUint64(event.TokenId)
-					// Adicionar à segunda tabela
+
 					cr.AddToSecondaryTable(ctx, SecondaryForSale{
 						TokenID: tokenID,
 						Seller:  event.Seller.Hex(),
@@ -385,7 +384,7 @@ func (cr *ContractRepository) ListenSecondarySold(ctx context.Context) {
 					log.Println(formattedEvent)
 
 					tokenID := bigIntToUint64(event.TokenId)
-					// Subtrair da segunda tabela
+
 					cr.SubtractFromSecondaryTable(ctx, SecondarySold{
 						TokenID: tokenID,
 						Seller:  event.Seller.Hex(),
@@ -458,14 +457,12 @@ func (repo *ContractRepository) SubtractFromSecondaryTable(ctx context.Context, 
 }
 
 func formatPriceBigInt(price *big.Int) string {
-	// Divide por 10^16 para cortar 16 casas decimais
+
 	price.Div(price, new(big.Int).Exp(big.NewInt(10), big.NewInt(16), nil))
 
-	// Converte para float64 e formata com duas casas decimais
 	priceFloat := new(big.Float).SetInt(price)
 	priceFloat.Quo(priceFloat, big.NewFloat(100))
 
-	// Converte para string com precisão de 2 casas decimais
 	priceStr := fmt.Sprintf("%.2f", priceFloat)
 
 	return priceStr
