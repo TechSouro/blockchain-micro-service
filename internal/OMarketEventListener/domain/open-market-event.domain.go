@@ -2,32 +2,6 @@ package OMarketEventListener
 
 import "github.com/ethereum/go-ethereum/common"
 
-/**
-* @dev soldity events signature
-* event publicOrderCreated(
-		uint256 indexed _tokenId,
-		uint256 indexed _price,
-		uint256 indexed _available
-);
-	event primarySale(
-		address indexed _sender,
-		uint256 indexed _tokenId,
-		uint256 indexed _amount
-		);
-	event secondaryForSale(
-		address indexed _seller,
-		uint256 indexed _tokenId,
-		uint256 indexed _units,
-		uint256 _price
-		);
-	event secondarySold(
-		address indexed _seller,
-		address indexed _buyer,
-		uint256 indexed _units,
-		uint256 _price,
-		uint256 _tokenId);
-*/
-
 type PublicOrderCreated struct {
 	TokenID   uint64
 	Price     uint64

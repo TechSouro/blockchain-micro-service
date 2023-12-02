@@ -13,14 +13,56 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/fatih/color"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
+
+type PrimaryTable struct {
+	TokenID   uint64
+	Available uint64
+	Price     string
+}
+
+type SecondaryTable struct {
+	TokenID   uint64
+	Seller    string
+	Available uint64
+	Price     string
+}
+
+type PublicOrderCreated struct {
+	TokenID   uint64
+	Available uint64
+	Price     *big.Int
+}
+
+type PrimarySale struct {
+	TokenID uint64
+	Amount  uint64
+}
+
+type SecondaryForSale struct {
+	TokenID uint64
+	Seller  string // Altere o tipo para o que você usa para representar endereços Ethereum
+	Units   uint64
+	Price   *big.Int
+}
+
+type SecondarySold struct {
+	TokenID uint64
+	Seller  string // Altere o tipo para o que você usa para representar endereços Ethereum
+	Buyer   string // Altere o tipo para o que você usa para representar endereços Ethereum
+	Units   uint64
+	Price   uint64
+}
 
 type ContractRepository struct {
 	contract *pkg.OpenMarket
 	client   *ethclient.Client
+	DB       *gorm.DB
 }
 
-func NewContractRepository(clientURL string, contractAddress common.Address) (*ContractRepository, error) {
+func NewContractRepository(clientURL string, contractAddress common.Address, dbURL string) (*ContractRepository, error) {
 	client, err := ethclient.Dial(clientURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
@@ -28,13 +70,28 @@ func NewContractRepository(clientURL string, contractAddress common.Address) (*C
 	}
 	log.Printf("Ethereum client connected successfully")
 
-	contract, err := pkg.NewOpenMarket(contractAddress, client)
+	gormDB, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Failed to bind to deployed instance of contract: %v", err)
+		log.Fatalf("Failed to connect to the PostgreSQL database: %v", err)
 		return nil, err
 	}
 
-	return &ContractRepository{contract: contract, client: client}, nil
+	// Configura a automigração para criar tabelas automaticamente
+	err = gormDB.AutoMigrate(&PrimaryTable{}, &SecondaryTable{})
+	if err != nil {
+		log.Fatalf("Failed to automigrate tables: %v", err)
+		return nil, err
+	}
+
+	contract, err := pkg.NewOpenMarket(contractAddress, client)
+	if err != nil {
+		log.Fatalf("Failed to bind to the deployed instance of the contract: %v", err)
+		return nil, err
+	}
+
+	log.Printf("PostgreSQL database connected successfully")
+
+	return &ContractRepository{contract: contract, client: client, DB: gormDB}, nil
 }
 
 func (cr *ContractRepository) GetCurrentBlockNumber() (uint64, error) {
@@ -62,7 +119,7 @@ func formatPublicOrderCreatedEvent(event *pkg.OpenMarketPublicOrderCreated) stri
 		black("Public Order Created Event:"),
 		yellow("Token ID: "), event.TokenId,
 		yellow("Units: "), event.Units,
-		yellow("Price: "), formatBigInt(event.Price),
+		yellow("Price: "), formatPriceBigInt(event.Price),
 		yellow("Transaction Hash:"), event.Raw.TxHash.Hex(),
 		yellow("Block Number:"), event.Raw.BlockNumber,
 		yellow("Block Hash:"), event.Raw.BlockHash.Hex(),
@@ -98,8 +155,18 @@ func (cr *ContractRepository) ListenToPublicOrderCreated(ctx context.Context) {
 			for {
 				select {
 				case event := <-events:
-					formattedEvent := formatPublicOrderCreatedEvent(event)
-					log.Println(formattedEvent)
+					// formattedEvent := formatPublicOrderCreatedEvent(event)
+					log.Println(event.Price)
+
+					tokenID := bigIntToUint64(event.TokenId)
+					unitsAvailable := bigIntToUint64(event.Units)
+
+					// Adicionar à primeira tabela
+					cr.AddToPrimaryTable(ctx, PublicOrderCreated{
+						TokenID:   tokenID,
+						Available: unitsAvailable,
+						Price:     event.Price,
+					})
 				case err := <-sub.Err():
 					log.Printf("Subscription error: %v", err)
 					break
@@ -164,6 +231,13 @@ func (cr *ContractRepository) ListenToPrimarySale(ctx context.Context) {
 				case event := <-events:
 					formattedEvent := formatPrimarySaleEvent(event)
 					log.Println(formattedEvent)
+
+					tokenID := bigIntToUint64(event.TokenId)
+
+					cr.SubtractFromPrimaryTable(ctx, PrimarySale{
+						TokenID: tokenID,
+						Amount:  event.Amount.Uint64(),
+					})
 				case err := <-sub.Err():
 					log.Printf("Subscription error: %v", err)
 					break
@@ -188,7 +262,7 @@ func formatSecondaryForSaleEvent(event *pkg.OpenMarketSecondaryForSale) string {
 		yellow("Seller:"), event.Seller.Hex(),
 		yellow("Token ID:"), event.TokenId,
 		yellow("Units:"), event.Units,
-		yellow("Price:"), formatBigInt(event.Price),
+		yellow("Price:"), formatPriceBigInt(event.Price),
 		yellow("Block Number:"), event.Raw.BlockNumber,
 	)
 }
@@ -226,6 +300,15 @@ func (cr *ContractRepository) ListenSecondaryForSale(ctx context.Context) {
 				case event := <-events:
 					formattedEvent := formatSecondaryForSaleEvent(event)
 					fmt.Println(formattedEvent)
+
+					tokenID := bigIntToUint64(event.TokenId)
+					// Adicionar à segunda tabela
+					cr.AddToSecondaryTable(ctx, SecondaryForSale{
+						TokenID: tokenID,
+						Seller:  event.Seller.Hex(),
+						Units:   event.Units.Uint64(),
+						Price:   event.Price,
+					})
 				case err := <-sub.Err():
 					log.Printf("Subscription error: %v", err)
 					break
@@ -248,7 +331,7 @@ func formatSecondarySoldEvent(event *pkg.OpenMarketSecondarySold) string {
 		yellow("Seller:"), event.Seller.Hex(),
 		yellow("Buyer:"), event.Buyer.Hex(),
 		yellow("Units:"), event.Units,
-		yellow("Price:"), formatBigInt(event.Price),
+		yellow("Price:"), formatPriceBigInt(event.Price),
 		yellow("Token ID:"), event.TokenId,
 	)
 }
@@ -258,6 +341,13 @@ func formatBigInt(value *big.Int) string {
 		return "0"
 	}
 	return value.String()
+}
+
+func bigIntToUint64(value *big.Int) uint64 {
+	if value == nil {
+		return 0
+	}
+	return value.Uint64()
 }
 
 func (cr *ContractRepository) ListenSecondarySold(ctx context.Context) {
@@ -293,6 +383,16 @@ func (cr *ContractRepository) ListenSecondarySold(ctx context.Context) {
 				case event := <-events:
 					formattedEvent := formatSecondarySoldEvent(event)
 					log.Println(formattedEvent)
+
+					tokenID := bigIntToUint64(event.TokenId)
+					// Subtrair da segunda tabela
+					cr.SubtractFromSecondaryTable(ctx, SecondarySold{
+						TokenID: tokenID,
+						Seller:  event.Seller.Hex(),
+						Buyer:   event.Buyer.Hex(),
+						Units:   event.Units.Uint64(),
+						Price:   event.Price.Uint64(),
+					})
 				case err := <-sub.Err():
 					fmt.Printf("Subscription error: %v", err)
 					break
@@ -303,4 +403,70 @@ func (cr *ContractRepository) ListenSecondarySold(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+/** DATABASE /*
+ *
+ *
+ */
+func (repo *ContractRepository) AddToPrimaryTable(ctx context.Context, item PublicOrderCreated) {
+	priceValueDTO := formatPriceBigInt(item.Price)
+	fmt.Printf("DTO Price value: %v", item.Price)
+
+	primaryOrder := &PrimaryTable{
+		TokenID:   item.TokenID,
+		Available: item.Available,
+		Price:     priceValueDTO,
+	}
+
+	fmt.Printf("Primary order: %v", primaryOrder)
+	result := repo.DB.Create(primaryOrder)
+	if result.Error != nil {
+		log.Println("Error adding to primary_table:", result.Error)
+	}
+}
+
+func (repo *ContractRepository) SubtractFromPrimaryTable(ctx context.Context, item PrimarySale) {
+	result := repo.DB.Model(&PrimaryTable{}).
+		Where("TokenID = ?", item.TokenID).
+		Update("Available", gorm.Expr("Available - ?", item.Amount))
+	if result.Error != nil {
+		log.Println("Error subtracting from primary_table:", result.Error)
+	}
+}
+
+func (repo *ContractRepository) AddToSecondaryTable(ctx context.Context, item SecondaryForSale) {
+	secondaryOrder := &SecondaryTable{
+		TokenID:   item.TokenID,
+		Seller:    item.Seller,
+		Available: item.Units,
+		Price:     formatPriceBigInt(item.Price),
+	}
+	result := repo.DB.Create(secondaryOrder)
+	if result.Error != nil {
+		log.Println("Error adding to secondary_table:", result.Error)
+	}
+}
+
+func (repo *ContractRepository) SubtractFromSecondaryTable(ctx context.Context, item SecondarySold) {
+	result := repo.DB.Model(&SecondaryTable{}).
+		Where("TokenID = ?", item.TokenID).
+		Update("Available", gorm.Expr("Available - ?", item.Units))
+	if result.Error != nil {
+		log.Println("Error subtracting from secondary_table:", result.Error)
+	}
+}
+
+func formatPriceBigInt(price *big.Int) string {
+	// Divide por 10^16 para cortar 16 casas decimais
+	price.Div(price, new(big.Int).Exp(big.NewInt(10), big.NewInt(16), nil))
+
+	// Converte para float64 e formata com duas casas decimais
+	priceFloat := new(big.Float).SetInt(price)
+	priceFloat.Quo(priceFloat, big.NewFloat(100))
+
+	// Converte para string com precisão de 2 casas decimais
+	priceStr := fmt.Sprintf("%.2f", priceFloat)
+
+	return priceStr
 }
