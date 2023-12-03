@@ -18,38 +18,38 @@ import (
 )
 
 type PrimaryTable struct {
-	TokenID   uint64
+	TokenID   uint64 `gorm:"column:token_id"`
 	Available uint64
 	Price     string
 }
 
 type SecondaryTable struct {
-	TokenID   uint64
+	TokenID   uint64 `gorm:"column:token_id"`
 	Seller    string
 	Available uint64
 	Price     string
 }
 
 type PublicOrderCreated struct {
-	TokenID   uint64
+	TokenID   uint64 `gorm:"column:token_id"`
 	Available uint64
 	Price     *big.Int
 }
 
 type PrimarySale struct {
-	TokenID uint64
+	TokenID uint64 `gorm:"column:token_id"`
 	Amount  uint64
 }
 
 type SecondaryForSale struct {
-	TokenID uint64
+	TokenID uint64 `gorm:"column:token_id"`
 	Seller  string
 	Units   uint64
 	Price   *big.Int
 }
 
 type SecondarySold struct {
-	TokenID uint64
+	TokenID uint64 `gorm:"column:token_id"`
 	Seller  string
 	Buyer   string
 	Units   uint64
@@ -427,7 +427,7 @@ func (repo *ContractRepository) AddToPrimaryTable(ctx context.Context, item Publ
 
 func (repo *ContractRepository) SubtractFromPrimaryTable(ctx context.Context, item PrimarySale) {
 	result := repo.DB.Model(&PrimaryTable{}).
-		Where("TokenID = ?", item.TokenID).
+		Where("token_id = ?", item.TokenID).
 		Update("Available", gorm.Expr("Available - ?", item.Amount))
 	if result.Error != nil {
 		log.Println("Error subtracting from primary_table:", result.Error)
@@ -449,7 +449,7 @@ func (repo *ContractRepository) AddToSecondaryTable(ctx context.Context, item Se
 
 func (repo *ContractRepository) SubtractFromSecondaryTable(ctx context.Context, item SecondarySold) {
 	result := repo.DB.Model(&SecondaryTable{}).
-		Where("TokenID = ?", item.TokenID).
+		Where("token_id = ?", item.TokenID).
 		Update("Available", gorm.Expr("Available - ?", item.Units))
 	if result.Error != nil {
 		log.Println("Error subtracting from secondary_table:", result.Error)
