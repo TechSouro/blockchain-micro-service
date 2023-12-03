@@ -2,77 +2,173 @@ package OracleDrex
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"log"
+	"math/big"
+	"time"
+
 	pkg "service/pkg/smart-contracts"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-// TransferRepository provides methods for interacting with the Transfer event
-type TransferRepository struct {
-	contract *pkg.OracleDrexerc3643
-	client   *ethclient.Client
+type TransferTable struct {
+	tx_origin string
+	receiver  string
+	amount    uint64
+	timestamp uint64
 }
 
-// NewTransferRepository creates a new TransferRepository
-func NewTransferRepository(clientURL string, contractAddress common.Address) (*TransferRepository, error) {
+type EventTransfer struct {
+	From      common.Address `json:"from"`
+	To        common.Address `json:"to"`
+	Amount    *big.Int       `json:"amount"`
+	TxOrigin  common.Address `json:"tx_origin"`
+	Receiver  common.Address `json:"receiver"`
+	Timestamp uint64         `json:"timestamp"`
+	TxHash    common.Hash    `json:"tx_hash"`
+}
+
+type ContractRepository struct {
+	contract *pkg.OracleDrexerc3643
+	client   *ethclient.Client
+	DB       *gorm.DB
+}
+
+// Função para formatar o evento Transfer em um objeto JSON
+func formatTransferEvent(client *ethclient.Client, event *pkg.OracleDrexerc3643Transfer) ([]byte, error) {
+	// Obtenha o cabeçalho do bloco para obter a hora exata da transação
+	header, err := client.HeaderByHash(context.Background(), event.Raw.BlockHash)
+	if err != nil {
+		log.Printf("Error getting block header: %v", err)
+		return nil, err
+	}
+
+	// Crie um struct EventTransfer
+	transferEvent := EventTransfer{
+		From:      event.From,
+		To:        event.To,
+		Amount:    event.Value,
+		TxOrigin:  common.BytesToAddress(event.Raw.Topics[1].Bytes()),
+		Receiver:  common.BytesToAddress(event.Raw.Topics[2].Bytes()),
+		TxHash:    event.Raw.TxHash,
+		Timestamp: uint64(header.Time),
+	}
+
+	// Converta o struct para JSON formatado
+	jsonData, err := json.MarshalIndent(transferEvent, "", "    ")
+	if err != nil {
+		log.Printf("Error formatting Transfer event to JSON: %v", err)
+		return nil, err
+	}
+
+	return jsonData, nil
+}
+
+func NewContractRepository(clientURL string, contractAddress common.Address, dbURL string) (*ContractRepository, error) {
 	client, err := ethclient.Dial(clientURL)
 	if err != nil {
+		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
+		return nil, err
+	}
+	log.Printf("Ethereum client connected successfully")
+
+	gormDB, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("Failed to connect to the PostgreSQL database: %v", err)
+		return nil, err
+	}
+
+	// Configura a automigração para criar tabelas automaticamente
+	err = gormDB.AutoMigrate(&TransferTable{})
+	if err != nil {
+		log.Fatalf("Failed to automigrate tables: %v", err)
 		return nil, err
 	}
 
 	contract, err := pkg.NewOracleDrexerc3643(contractAddress, client)
 	if err != nil {
+		log.Fatalf("Failed to bind to the deployed instance of the contract: %v", err)
 		return nil, err
 	}
 
-	return &TransferRepository{
-		contract: contract,
-		client:   client,
-	}, nil
+	log.Printf("PostgreSQL database connected successfully")
+
+	return &ContractRepository{contract: contract, client: client, DB: gormDB}, nil
 }
 
-// ListenToTransfer listens to the Transfer event and calls the provided callback function
-func (tr *TransferRepository) ListenToTransfer(ctx context.Context, callback func(event pkg.OracleDrexerc3643Transfer) error) error {
-	opts := &bind.WatchOpts{Context: ctx}
-
-	events := make(chan *pkg.OracleDrexerc3643Transfer)
-
-	sub, err := tr.contract.WatchTransfer(opts, events)
-	if err != nil {
-		return err
+func (cr *ContractRepository) GetCurrentBlockNumber() (uint64, error) {
+	if cr.client == nil {
+		log.Println("Ethereum client not initialized")
+		return 0, errors.New("ethereum client not initialized")
 	}
 
+	header, err := cr.client.HeaderByNumber(context.Background(), nil)
+	if err != nil {
+		log.Printf("Error getting current block number: %v", err)
+		return 0, err
+	}
+
+	return header.Number.Uint64(), nil
+}
+
+// event
+// event
+func (cr *ContractRepository) ListenTransferEvent(ctx context.Context) {
 	go func() {
-		defer sub.Unsubscribe()
-
 		for {
-			select {
-			case event := <-events:
-				// Convert event data to a more usable format
-				transferEvent := pkg.OracleDrexerc3643Transfer{
-					From:   event.From.Hex(),
-					To:     event.To.Hex(),
-					Amount: event.Amount,
-				}
-
-				// Call the callback function
-				err := callback(transferEvent)
-				if err != nil {
-					// Handle error from the callback, e.g., log the error
-					log.Printf("Error in callback: %v", err)
-				}
-			case err := <-sub.Err():
-				// Handle subscription error
-				log.Printf("Subscription error: %v", err)
-				return
-			case <-ctx.Done():
-				return
+			currentBlock, err := cr.GetCurrentBlockNumber()
+			if err != nil {
+				log.Printf("Error getting current block number: %v", err)
+				time.Sleep(time.Second * 10)
+				continue
 			}
+
+			log.Printf("Current Block: %v", currentBlock)
+
+			opts := &bind.WatchOpts{Start: &currentBlock, Context: ctx}
+			events := make(chan *pkg.OracleDrexerc3643Transfer)
+
+			var from []common.Address
+			var to []common.Address
+
+			sub, err := cr.contract.WatchTransfer(opts, events, from, to)
+			if err != nil {
+				log.Printf("Failed to watch event logs: %v", err)
+				time.Sleep(time.Second * 5)
+				continue
+			}
+
+			for {
+				select {
+				case event := <-events:
+					formattedEvent, err := formatTransferEvent(cr.client, event)
+					if err != nil {
+						log.Printf("Error formatting Transfer event: %v", err)
+						continue
+					}
+
+					log.Println(string(formattedEvent))
+					// cr.AddToPrimaryTable(ctx, PublicOrderCreated{
+					// 	TokenID:   tokenID,
+					// 	Available: unitsAvailable,
+					// 	Price:     event.Price,
+					// })
+				case err := <-sub.Err():
+					log.Printf("Subscription error: %v", err)
+					break
+				case <-ctx.Done():
+					return
+				}
+			}
+
+			sub.Unsubscribe()
+			time.Sleep(time.Second * 5)
 		}
 	}()
-
-	return nil
 }
