@@ -15,6 +15,7 @@ func InitEventSystem() {
 	clientURL := "ws://127.0.01:6175"
 	contractAddr := common.HexToAddress("0xAdDBA9A148680AA3d00dDcF31CFa3Ec9226de100")
 	drexContractAddr := common.HexToAddress("0x10D6995F33Aa5A8e0cCbb882eBE30B51950FC118")
+	vaultAddressToTarget := common.HexToAddress("0x809AB5997Ca2D69470f3a154d653ab096d818077")
 
 	// PostgreSQL database URL
 	dbURL := "postgres://admin:123@lunave@localhost:5432/blockservice"
@@ -40,7 +41,7 @@ func InitEventSystem() {
 	go openMarketEventUseCase.ProcessSecondarySold()
 
 	// initialize oracleDrex events
-	go oracleDrexEventUseCase.ProcessListenTransferEvent()
+	go oracleDrexEventUseCase.ProcessListenTransferEvent(vaultAddressToTarget)
 
 	log.Println("Event system initialized and listening for events")
 }

@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"math/big"
-	"time"
-
 	pkg "service/pkg/smart-contracts"
+	strings "strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -18,10 +19,11 @@ import (
 )
 
 type TransferTable struct {
-	tx_origin string
-	receiver  string
-	amount    uint64
-	timestamp uint64
+	ID        uint64 `gorm:"primaryKey"`
+	TxOrigin  string `gorm:"column:tx_origin"`
+	Receiver  string `gorm:"column:receiver"`
+	Amount    uint64 `gorm:"column:amount"`
+	Timestamp string `gorm:"column:timestamp"`
 }
 
 type EventTransfer struct {
@@ -118,8 +120,7 @@ func (cr *ContractRepository) GetCurrentBlockNumber() (uint64, error) {
 }
 
 // event
-// event
-func (cr *ContractRepository) ListenTransferEvent(ctx context.Context) {
+func (cr *ContractRepository) ListenTransferEvent(ctx context.Context, targetAddress common.Address) {
 	go func() {
 		for {
 			currentBlock, err := cr.GetCurrentBlockNumber()
@@ -147,18 +148,28 @@ func (cr *ContractRepository) ListenTransferEvent(ctx context.Context) {
 			for {
 				select {
 				case event := <-events:
-					formattedEvent, err := formatTransferEvent(cr.client, event)
-					if err != nil {
-						log.Printf("Error formatting Transfer event: %v", err)
-						continue
-					}
+					// Verifique se o remetente é igual ao endereço alvo
+					if event.From == targetAddress {
+						formattedEvent, err := formatTransferEvent(cr.client, event)
+						if err != nil {
+							log.Printf("Error formatting Transfer event: %v", err)
+							continue
+						}
 
-					log.Println(string(formattedEvent))
-					// cr.AddToPrimaryTable(ctx, PublicOrderCreated{
-					// 	TokenID:   tokenID,
-					// 	Available: unitsAvailable,
-					// 	Price:     event.Price,
-					// })
+						log.Println(string(formattedEvent))
+
+						txOriginReceipt := common.BytesToAddress(event.Raw.Topics[1].Bytes())
+						txReceiverReceipt := common.BytesToAddress(event.Raw.Topics[2].Bytes())
+
+						// save in the database
+						cr.SaveTransferEvent(ctx, TransferTable{
+							TxOrigin:  txOriginReceipt.String(),
+							Receiver:  txReceiverReceipt.String(),
+							Amount:    event.Value.Uint64(),
+							Timestamp: strings.FormatUint(uint64(time.Now().Unix()), 10),
+						})
+
+					}
 				case err := <-sub.Err():
 					log.Printf("Subscription error: %v", err)
 					break
@@ -171,4 +182,31 @@ func (cr *ContractRepository) ListenTransferEvent(ctx context.Context) {
 			time.Sleep(time.Second * 5)
 		}
 	}()
+}
+
+func (repo *ContractRepository) SaveTransferEvent(ctx context.Context, item TransferTable) {
+
+	tx := repo.DB.Begin()
+
+	transferOmitted := &TransferTable{
+		TxOrigin:  item.TxOrigin,
+		Receiver:  item.Receiver,
+		Amount:    item.Amount,
+		Timestamp: item.Timestamp,
+	}
+
+	fmt.Printf("Transfer Event Listed: %v", transferOmitted)
+
+	// Salve os dados na tabela
+	result := tx.Create(transferOmitted)
+
+	if result.Error != nil {
+		log.Println("Error adding to primary_table:", result.Error)
+
+		tx.Rollback()
+		return
+	}
+
+	// Commita a transação
+	tx.Commit()
 }
