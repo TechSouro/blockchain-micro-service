@@ -12,10 +12,10 @@ import (
 
 func InitEventSystem() {
 	// Ethereum client
-	clientURL := "ws://127.0.01:6175"
-	contractAddr := common.HexToAddress("0xAdDBA9A148680AA3d00dDcF31CFa3Ec9226de100")
-	drexContractAddr := common.HexToAddress("0x10D6995F33Aa5A8e0cCbb882eBE30B51950FC118")
-	vaultAddressToTarget := common.HexToAddress("0x809AB5997Ca2D69470f3a154d653ab096d818077")
+	clientURL := "wss://polygon-mumbai.infura.io/ws/v3/60786ed4ffd74c75b4b0bb369cde55f7"
+	contractAddr := common.HexToAddress("0x1b77035396c89197509511e9865318329F48B9C3")
+	drexContractAddr := common.HexToAddress("0xa56972E78DD14CD54A81A08BE5CA3B43724a07F1")
+	vaultAddressToTarget := common.HexToAddress("0x10c45F21464B9EdDb2a82dea04F1D60bba3f73aa")
 
 	// PostgreSQL database URL
 	dbURL := "postgres://admin:123@lunave@localhost:5432/blockservice"

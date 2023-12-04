@@ -78,7 +78,6 @@ func NewContractRepository(clientURL string, contractAddress common.Address, dbU
 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
 		return nil, err
 	}
-	log.Printf("Ethereum client connected successfully")
 
 	gormDB, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
 	if err != nil {
@@ -98,8 +97,6 @@ func NewContractRepository(clientURL string, contractAddress common.Address, dbU
 		log.Fatalf("Failed to bind to the deployed instance of the contract: %v", err)
 		return nil, err
 	}
-
-	log.Printf("PostgreSQL database connected successfully")
 
 	return &ContractRepository{contract: contract, client: client, DB: gormDB}, nil
 }
