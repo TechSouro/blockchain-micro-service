@@ -109,7 +109,11 @@ func (cr *ContractRepository) GetCurrentBlockNumber() (uint64, error) {
 	return header.Number.Uint64(), nil
 }
 
-// ------------------------- Public Order Created Event ----------------------------
+/**
+ * ----------------------------------------------------------------------------------------------------
+ * Formats outputs in the terminal logs
+ * ----------------------------------------------------------------------------------------------------
+ */
 func formatPublicOrderCreatedEvent(event *pkg.OpenMarketPublicOrderCreated) string {
 	black := color.New(color.BgHiBlack).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
@@ -127,6 +131,99 @@ func formatPublicOrderCreatedEvent(event *pkg.OpenMarketPublicOrderCreated) stri
 	)
 }
 
+func formatPrimarySaleEvent(event *pkg.OpenMarketPrimarySale) string {
+	cyan := color.New(color.BgCyan).SprintFunc()
+	yellow := color.New(color.FgYellow).SprintFunc()
+
+	return fmt.Sprintf(
+		"%s\n\t%s %s\n\t%s %d\n\t%s %d\n\t%s %s\n\t%s %d\n",
+		cyan("Primary Sale Event:"),
+		yellow("Sender:"), event.Sender.Hex(),
+		yellow("Token ID:"), event.TokenId,
+		yellow("Amount:"), event.Amount,
+		yellow("Transaction Hash:"), event.Raw.TxHash.Hex(),
+		yellow("Block Number:"), event.Raw.BlockNumber,
+	)
+}
+
+func formatSecondaryForSaleEvent(event *pkg.OpenMarketSecondaryForSale) string {
+	green := color.New(color.BgGreen).SprintFunc()
+	yellow := color.New(color.FgYellow).SprintFunc()
+
+	return fmt.Sprintf(
+		"%s\n\t%s %s\n\t%s %d\n\t%s %d\n\t%s %s\n\t%s %d\n",
+		green("Secondary For Sale Event:"),
+		yellow("Seller:"), event.Seller.Hex(),
+		yellow("Token ID:"), event.TokenId,
+		yellow("Units:"), event.Units,
+		yellow("Price:"), formatPriceBigInt(event.Price),
+		yellow("Block Number:"), event.Raw.BlockNumber,
+	)
+}
+
+func formatSecondarySoldEvent(event *pkg.OpenMarketSecondarySold) string {
+	magent := color.New(color.BgMagenta).SprintFunc()
+	yellow := color.New(color.FgYellow).SprintFunc()
+
+	return fmt.Sprintf(
+		"%s\n\t%s %s\n\t%s %s\n\t%s %d\n\t%s %s\n\t%s %d\n",
+		magent("Secondary Sold Event:"),
+		yellow("Seller:"), event.Seller.Hex(),
+		yellow("Buyer:"), event.Buyer.Hex(),
+		yellow("Units:"), event.Units,
+		yellow("Price:"), formatPriceBigInt(event.Price),
+		yellow("Token ID:"), event.TokenId,
+	)
+}
+
+func formatPriceBigInt(price *big.Int) string {
+	// Divide o preço por 10^16
+	price.Div(price, new(big.Int).Exp(big.NewInt(10), big.NewInt(16), nil))
+
+	// Cria um big.Float a partir do preço
+	priceFloat := new(big.Float).SetInt(price)
+
+	// Divide o preço float por 100 (para converter para porcentagem)
+	priceFloat.Quo(priceFloat, big.NewFloat(100))
+
+	// Converte o preço float para uma string formatada
+	return fmt.Sprintf("%.2f", priceFloat)
+}
+
+func formatBigInt(value *big.Int) string {
+	if value == nil {
+		return "0"
+	}
+	return value.String()
+}
+
+func bigIntToUint64(value *big.Int) uint64 {
+	if value == nil {
+		return 0
+	}
+	return value.Uint64()
+}
+
+/**
+ * ----------------------------------------------------------------------------------------------------
+ * xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ * ----------------------------------------------------------------------------------------------------
+ */
+
+/**
+ * ----------------------------------------------------------------------------------------------------
+ * Listenings events on blockchain
+ * ----------------------------------------------------------------------------------------------------
+ */
+
+func formatPriceTwo(price *big.Int) string {
+	// Convertendo o preço para Ether
+	etherValue := new(big.Float).Quo(new(big.Float).SetInt(price), big.NewFloat(1e18))
+
+	// Converte o preço float para uma string formatada
+	return fmt.Sprintf("%.18f", etherValue)
+}
+
 func (cr *ContractRepository) ListenToPublicOrderCreated(ctx context.Context) {
 	go func() {
 		for {
@@ -136,8 +233,6 @@ func (cr *ContractRepository) ListenToPublicOrderCreated(ctx context.Context) {
 				time.Sleep(time.Second * 10)
 				continue
 			}
-
-			log.Printf("Current Block: %v", currentBlock)
 
 			opts := &bind.WatchOpts{Start: &currentBlock, Context: ctx}
 			events := make(chan *pkg.OpenMarketPublicOrderCreated)
@@ -155,17 +250,18 @@ func (cr *ContractRepository) ListenToPublicOrderCreated(ctx context.Context) {
 			for {
 				select {
 				case event := <-events:
-					formattedEvent := formatPublicOrderCreatedEvent(event)
+					// formattedEvent := formatPublicOrderCreatedEvent(event)
 
-					log.Println(formattedEvent)
+					// log.Println(formattedEvent)
 					tokenID := bigIntToUint64(event.TokenId)
 					unitsAvailable := bigIntToUint64(event.Units)
-					price := event.Price
+
+					log.Printf("ListenFunction Price in Ether: %v", event.Price)
 
 					cr.AddToPrimaryTable(ctx, PublicOrderCreated{
 						TokenID:   tokenID,
 						Available: unitsAvailable,
-						Price:     price,
+						Price:     event.Price,
 					})
 				case err := <-sub.Err():
 					log.Printf("Subscription error: %v", err)
@@ -181,21 +277,6 @@ func (cr *ContractRepository) ListenToPublicOrderCreated(ctx context.Context) {
 	}()
 }
 
-// ------------------------- primaryForSale Event ----------------------------
-func formatPrimarySaleEvent(event *pkg.OpenMarketPrimarySale) string {
-	cyan := color.New(color.BgCyan).SprintFunc()
-	yellow := color.New(color.FgYellow).SprintFunc()
-
-	return fmt.Sprintf(
-		"%s\n\t%s %s\n\t%s %d\n\t%s %d\n\t%s %s\n\t%s %d\n",
-		cyan("Primary Sale Event:"),
-		yellow("Sender:"), event.Sender.Hex(),
-		yellow("Token ID:"), event.TokenId,
-		yellow("Amount:"), event.Amount,
-		yellow("Transaction Hash:"), event.Raw.TxHash.Hex(),
-		yellow("Block Number:"), event.Raw.BlockNumber,
-	)
-}
 func (cr *ContractRepository) ListenToPrimarySale(ctx context.Context) {
 	go func() {
 		for {
@@ -248,23 +329,6 @@ func (cr *ContractRepository) ListenToPrimarySale(ctx context.Context) {
 			}
 		}
 	}()
-}
-
-// ------------------------- secundaryForSale Event ----------------------------
-
-func formatSecondaryForSaleEvent(event *pkg.OpenMarketSecondaryForSale) string {
-	green := color.New(color.BgGreen).SprintFunc()
-	yellow := color.New(color.FgYellow).SprintFunc()
-
-	return fmt.Sprintf(
-		"%s\n\t%s %s\n\t%s %d\n\t%s %d\n\t%s %s\n\t%s %d\n",
-		green("Secondary For Sale Event:"),
-		yellow("Seller:"), event.Seller.Hex(),
-		yellow("Token ID:"), event.TokenId,
-		yellow("Units:"), event.Units,
-		yellow("Price:"), formatPriceBigInt(event.Price),
-		yellow("Block Number:"), event.Raw.BlockNumber,
-	)
 }
 
 func (cr *ContractRepository) ListenSecondaryForSale(ctx context.Context) {
@@ -325,35 +389,6 @@ func (cr *ContractRepository) ListenSecondaryForSale(ctx context.Context) {
 	}()
 }
 
-func formatSecondarySoldEvent(event *pkg.OpenMarketSecondarySold) string {
-	magent := color.New(color.BgMagenta).SprintFunc()
-	yellow := color.New(color.FgYellow).SprintFunc()
-
-	return fmt.Sprintf(
-		"%s\n\t%s %s\n\t%s %s\n\t%s %d\n\t%s %s\n\t%s %d\n",
-		magent("Secondary Sold Event:"),
-		yellow("Seller:"), event.Seller.Hex(),
-		yellow("Buyer:"), event.Buyer.Hex(),
-		yellow("Units:"), event.Units,
-		yellow("Price:"), formatPriceBigInt(event.Price),
-		yellow("Token ID:"), event.TokenId,
-	)
-}
-
-func formatBigInt(value *big.Int) string {
-	if value == nil {
-		return "0"
-	}
-	return value.String()
-}
-
-func bigIntToUint64(value *big.Int) uint64 {
-	if value == nil {
-		return 0
-	}
-	return value.Uint64()
-}
-
 func (cr *ContractRepository) ListenSecondarySold(ctx context.Context) {
 	go func() {
 		for {
@@ -410,13 +445,19 @@ func (cr *ContractRepository) ListenSecondarySold(ctx context.Context) {
 	}()
 }
 
-/** DATABASE /*
- *
- *
+/**
+ * ----------------------------------------------------------------------------------------------------
+ * xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ * ----------------------------------------------------------------------------------------------------
+ */
+
+/**
+ * ----------------------------------------------------------------------------------------------------
+ * Database save methods
+ * ----------------------------------------------------------------------------------------------------
  */
 func (repo *ContractRepository) AddToPrimaryTable(ctx context.Context, item PublicOrderCreated) {
 	priceValueDTO := formatPriceBigInt(item.Price)
-	fmt.Printf("DTO Price value: %v", item.Price)
 
 	primaryOrder := &PrimaryTable{
 		TokenID:   item.TokenID,
@@ -460,29 +501,4 @@ func (repo *ContractRepository) SubtractFromSecondaryTable(ctx context.Context, 
 	if result.Error != nil {
 		log.Println("Error subtracting from secondary_table:", result.Error)
 	}
-}
-
-// func formatPriceBigInt(price *big.Int) string {
-
-// 	price.Div(price, new(big.Int).Exp(big.NewInt(10), big.NewInt(16), nil))
-
-// 	priceFloat := new(big.Float).SetInt(price)
-// 	priceFloat.Quo(priceFloat, big.NewFloat(100))
-
-// 	priceStr := fmt.Sprintf("%.2f", priceFloat)
-
-//		return priceStr
-//	}
-func formatPriceBigInt(price *big.Int) string {
-	// Divide o preço por 10^16
-	price.Div(price, new(big.Int).Exp(big.NewInt(10), big.NewInt(16), nil))
-
-	// Cria um big.Float a partir do preço
-	priceFloat := new(big.Float).SetInt(price)
-
-	// Divide o preço float por 100 (para converter para porcentagem)
-	priceFloat.Quo(priceFloat, big.NewFloat(100))
-
-	// Converte o preço float para uma string formatada
-	return fmt.Sprintf("%.2f", priceFloat)
 }
