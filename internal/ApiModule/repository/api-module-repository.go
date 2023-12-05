@@ -58,3 +58,12 @@ func (repo *ApiRepository) GetAllSecondaryTableItems() ([]domain.SecondaryCreate
 
 	return secondaryOrders, nil
 }
+
+func (repo *ApiRepository) GetAllTransferTableItems() ([]domain.TransferCreatedTable, error) {
+	var transferItems []domain.TransferCreatedTable
+	if err := repo.DB.Table("transfer_tables").Find(&transferItems).Error; err != nil {
+		return nil, err
+	}
+
+	return transferItems, nil
+}

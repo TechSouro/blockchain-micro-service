@@ -37,3 +37,12 @@ func (uc *ApiUseCase) GetAllSecondaryTableItems() ([]domain.SecondaryCreatedTabl
 
 	return secondaryOrders, nil
 }
+
+func (uc *ApiUseCase) GetAllTransferTableItems() ([]domain.TransferCreatedTable, error) {
+	transferItems, err := uc.repo.GetAllTransferTableItems()
+	if err != nil {
+		return nil, err
+	}
+
+	return transferItems, nil
+}

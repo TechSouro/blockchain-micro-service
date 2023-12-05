@@ -14,6 +14,6 @@ func ConfigureAPIRoutes(apiHandler *handler.ApiHandler) *mux.Router {
 	r.HandleFunc("/api/treasurys", apiHandler.GetTreasuryEventsHandler).Methods("GET")
 	r.HandleFunc("/api/primarysale", apiHandler.GetPrimaryTableHandler).Methods("GET")
 	r.HandleFunc("/api/secondarysale", apiHandler.GetAllSecondaryTableItemsHandler).Methods("GET")
-
+	r.HandleFunc("/api/transfers", apiHandler.GetAllTransferTableItemsHandler).Methods("GET")
 	return r
 }

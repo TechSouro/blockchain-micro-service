@@ -67,3 +67,20 @@ func (ah *ApiHandler) GetAllSecondaryTableItemsHandler(w http.ResponseWriter, r 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJSON)
 }
+
+func (ah *ApiHandler) GetAllTransferTableItemsHandler(w http.ResponseWriter, r *http.Request) {
+	transferItems, err := ah.useCase.GetAllTransferTableItems()
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	responseJSON, err := json.Marshal(transferItems)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(responseJSON)
+}

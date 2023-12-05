@@ -29,3 +29,11 @@ type SecondaryCreatedTable struct {
 	Available uint64 `json:"available"`
 	Price     string `json:"price"`
 }
+
+type TransferCreatedTable struct {
+	ID        uint64 `json:"id"`
+	TxOrigin  string `json:"tx_origin"`
+	Receiver  string `json:"receiver"`
+	Amount    uint64 `json:"amount"`
+	Timestamp string `json:"timestamp"`
+}
