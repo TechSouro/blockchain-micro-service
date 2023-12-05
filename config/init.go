@@ -18,11 +18,19 @@ func InitEventSystem() {
 	// Ethereum client
 
 	// clientURL := "wss://sepolia.infura.io/ws/v3/60786ed4ffd74c75b4b0bb369cde55f7"
-	clientURL := "ws://127.0.01:6175"
-	contractAddr := common.HexToAddress("0x232efcE3E92a8126Ae6A91ECb78844b8D607Ed71")
-	drexContractAddr := common.HexToAddress("0xF8fFf65FA486769ff4486d6B79a7D1f213E0Ff9C")
-	vaultAddressToTarget := common.HexToAddress("0x4Eb845fc5eedcf3f1a7925F47372a3a9aa437adE")
-	tesouroDiretoAddr := common.HexToAddress("0xe0cA2EeE246a72e86F2949F5F01bAb733a09209c")
+	/** Development */
+	// clientURL := "ws://127.0.01:6175"
+	// contractAddr := common.HexToAddress("0x232efcE3E92a8126Ae6A91ECb78844b8D607Ed71")
+	// drexContractAddr := common.HexToAddress("0xF8fFf65FA486769ff4486d6B79a7D1f213E0Ff9C")
+	// vaultAddressToTarget := common.HexToAddress("0x4Eb845fc5eedcf3f1a7925F47372a3a9aa437adE")
+	// tesouroDiretoAddr := common.HexToAddress("0xe0cA2EeE246a72e86F2949F5F01bAb733a09209c")
+
+	/* Prod */
+	clientURL := "wss://sepolia.infura.io/ws/v3/60786ed4ffd74c75b4b0bb369cde55f7"
+	contractAddr := common.HexToAddress("0x1B6eaa6C2DaB9293A17e543314900B86a6C1E5d0")
+	drexContractAddr := common.HexToAddress("0xB2a0afB6Ee09879F163409567637DcfF8a0F856C")
+	vaultAddressToTarget := common.HexToAddress("0x24E557d92157D34B74935ef045C89c8D8f4FbAC6")
+	tesouroDiretoAddr := common.HexToAddress("0xcd95aeE273bc527AA045c68063483f4E5A8a4812")
 
 	// PostgreSQL database URL
 	dbURL := "postgres://admin:123@lunave@localhost:5432/blockservice"
