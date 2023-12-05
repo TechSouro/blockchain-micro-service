@@ -160,11 +160,12 @@ func (cr *ContractRepository) ListenToPublicOrderCreated(ctx context.Context) {
 					log.Println(formattedEvent)
 					tokenID := bigIntToUint64(event.TokenId)
 					unitsAvailable := bigIntToUint64(event.Units)
+					price := event.Price
 
 					cr.AddToPrimaryTable(ctx, PublicOrderCreated{
 						TokenID:   tokenID,
 						Available: unitsAvailable,
-						Price:     event.Price,
+						Price:     price,
 					})
 				case err := <-sub.Err():
 					log.Printf("Subscription error: %v", err)
@@ -461,14 +462,27 @@ func (repo *ContractRepository) SubtractFromSecondaryTable(ctx context.Context, 
 	}
 }
 
-func formatPriceBigInt(price *big.Int) string {
+// func formatPriceBigInt(price *big.Int) string {
 
+// 	price.Div(price, new(big.Int).Exp(big.NewInt(10), big.NewInt(16), nil))
+
+// 	priceFloat := new(big.Float).SetInt(price)
+// 	priceFloat.Quo(priceFloat, big.NewFloat(100))
+
+// 	priceStr := fmt.Sprintf("%.2f", priceFloat)
+
+//		return priceStr
+//	}
+func formatPriceBigInt(price *big.Int) string {
+	// Divide o preço por 10^16
 	price.Div(price, new(big.Int).Exp(big.NewInt(10), big.NewInt(16), nil))
 
+	// Cria um big.Float a partir do preço
 	priceFloat := new(big.Float).SetInt(price)
+
+	// Divide o preço float por 100 (para converter para porcentagem)
 	priceFloat.Quo(priceFloat, big.NewFloat(100))
 
-	priceStr := fmt.Sprintf("%.2f", priceFloat)
-
-	return priceStr
+	// Converte o preço float para uma string formatada
+	return fmt.Sprintf("%.2f", priceFloat)
 }

@@ -2,6 +2,7 @@
 package ApiModule
 
 import (
+	"math/big"
 	domain "service/internal/ApiModule/domain"
 
 	"gorm.io/gorm"
@@ -33,12 +34,20 @@ func (ar *ApiRepository) GetTreasuryEvents() ([]domain.GetTreasuryResponse, erro
 
 func TreasuryCreatedTableToApiResponse(treasury domain.TreasuryCreatedTable) domain.GetTreasuryResponse {
 	return domain.GetTreasuryResponse{
-		TokenID:      treasury.TokenID,
-		TotalValue:   treasury.TotalValue,
+		TokenID: treasury.TokenID,
+		// TotalValue: bigIntToUint64(treasury.TotalValue.Int),
 		APY:          treasury.APY,
 		Duration:     treasury.Duration,
-		TreasuryType: treasury.TreasuryType,
+		TreasuryType: uint8(treasury.TreasuryType),
 	}
+}
+
+// Função auxiliar para converter big.Int para uint64
+func bigIntToUint64(value *big.Int) uint64 {
+	if value == nil {
+		return 0
+	}
+	return value.Uint64()
 }
 
 func (repo *ApiRepository) GetAllPrimaryTableItems() ([]domain.PrimaryCreatedTable, error) {

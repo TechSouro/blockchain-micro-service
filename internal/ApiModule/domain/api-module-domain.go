@@ -1,6 +1,10 @@
 // ApiModule/domain/api_types.go
 package ApiModule
 
+import (
+	"math/big"
+)
+
 type GetTreasuryResponse struct {
 	TokenID      uint64 `json:"token_id"`
 	TotalValue   uint64 `json:"total_value"`
@@ -9,12 +13,15 @@ type GetTreasuryResponse struct {
 	TreasuryType uint8  `json:"treasury_type"`
 }
 
+type Bigint struct {
+	*big.Int
+}
+
 type TreasuryCreatedTable struct {
-	TokenID      uint64 `gorm:"column:token_id"`
-	TotalValue   uint64 `gorm:"column:total_value"`
-	APY          uint64 `gorm:"column:apy"`
-	Duration     uint64 `gorm:"column:duration"`
-	TreasuryType uint8  `gorm:"column:treasury_type"`
+	TokenID      uint64
+	APY          uint64
+	Duration     uint64
+	TreasuryType uint64
 }
 
 type PrimaryCreatedTable struct {

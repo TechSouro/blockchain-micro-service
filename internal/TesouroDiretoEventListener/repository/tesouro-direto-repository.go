@@ -2,6 +2,7 @@ package OMarketEventListener
 
 import (
 	"context"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"log"
@@ -16,18 +17,39 @@ import (
 	"gorm.io/gorm"
 )
 
-type TreasuryCreatedTable struct {
-	TokenID      uint64
-	TotalValue   uint64
-	APY          uint64
-	Duration     uint64
-	TreasuryType uint8
-}
-
 type ContractRepository struct {
 	contract *pkg.TesouroDireto
 	client   *ethclient.Client
 	DB       *gorm.DB
+}
+
+type Bigint struct {
+	*big.Int
+}
+
+type TreasuryCreatedTable struct {
+	TokenID      uint64
+	TotalValue   Bigint
+	APY          uint64
+	Duration     uint64
+	TreasuryType uint64
+}
+
+// Value implements the driver.Valuer interface
+func (i Bigint) Value() (driver.Value, error) {
+	return i.Int.String(), nil
+}
+
+func (i *Bigint) Scan(src interface{}) error {
+	switch src := src.(type) {
+	case int64:
+		i.Int = big.NewInt(src)
+	case []byte:
+		i.Int.SetString(string(src), 10)
+	default:
+		return driver.ErrSkip
+	}
+	return nil
 }
 
 func NewContractRepository(clientURL string, contractAddress common.Address, dbURL string) (*ContractRepository, error) {
@@ -78,22 +100,6 @@ func (cr *ContractRepository) GetCurrentBlockNumber() (uint64, error) {
 }
 
 // ------------------------- Public Order Created Event ----------------------------
-// func formatPublicOrderCreatedEvent(event *pkg.OpenMarketPublicOrderCreated) string {
-// 	black := color.New(color.BgHiBlack).SprintFunc()
-// 	yellow := color.New(color.FgYellow).SprintFunc()
-
-// 	return fmt.Sprintf(
-// 		"%s\n\t %s %d\n %s %d\n %s %s\n \t%s %s\n \t%s %d\n \t%s %s\n \t%s %d\n",
-// 		black("Public Order Created Event:"),
-// 		yellow("Token ID: "), event.TokenId,
-// 		yellow("Units: "), event.Units,
-// 		yellow("Price: "), formatPriceBigInt(event.Price),
-// 		yellow("Transaction Hash:"), event.Raw.TxHash.Hex(),
-// 		yellow("Block Number:"), event.Raw.BlockNumber,
-// 		yellow("Block Hash:"), event.Raw.BlockHash.Hex(),
-// 		yellow("Event Index:"), event.Raw.Index,
-// 	)
-// }
 
 func (cr *ContractRepository) ListenEmitTresureryCreated(ctx context.Context) {
 	go func() {
@@ -124,21 +130,22 @@ func (cr *ContractRepository) ListenEmitTresureryCreated(ctx context.Context) {
 			for {
 				select {
 				case event := <-events:
-					// formattedEvent := formatPublicOrderCreatedEvent(event)
-
 					tokenID := bigIntToUint64(event.TokenId)
-					totalValue := bigIntToUint64(event.TotalValue)
 					apy := bigIntToUint64(event.Apy)
 					duration := bigIntToUint64(event.Duration)
 					treasuryType := event.Arg4
+
+					// Crie uma instância de Bigint para TotalValue
+					totalValue := Bigint{Int: event.TotalValue}
 
 					cr.saveTreasuryCreated(ctx, TreasuryCreatedTable{
 						TokenID:      tokenID,
 						TotalValue:   totalValue,
 						APY:          apy,
 						Duration:     duration,
-						TreasuryType: treasuryType,
+						TreasuryType: uint64(treasuryType),
 					})
+
 				case err := <-sub.Err():
 					log.Printf("Subscription error: %v", err)
 					break
