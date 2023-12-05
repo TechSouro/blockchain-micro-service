@@ -155,9 +155,9 @@ func (cr *ContractRepository) ListenToPublicOrderCreated(ctx context.Context) {
 			for {
 				select {
 				case event := <-events:
-					// formattedEvent := formatPublicOrderCreatedEvent(event)
-					log.Println(event.Price)
+					formattedEvent := formatPublicOrderCreatedEvent(event)
 
+					log.Println(formattedEvent)
 					tokenID := bigIntToUint64(event.TokenId)
 					unitsAvailable := bigIntToUint64(event.Units)
 
@@ -271,24 +271,28 @@ func (cr *ContractRepository) ListenSecondaryForSale(ctx context.Context) {
 		for {
 			currentBlock, err := cr.GetCurrentBlockNumber()
 			if err != nil {
-				log.Printf("Error getting current block number to secundary sale: %v", err)
+				log.Printf("Error getting current block number: %v", err)
 				time.Sleep(time.Second * 10)
 				continue
 			}
+
+			log.Printf("Current Block: %v", currentBlock)
 
 			// Channel go to receive events
 			events := make(chan *pkg.OpenMarketSecondaryForSale)
 			opts := &bind.WatchOpts{Start: &currentBlock, Context: ctx}
 
 			// Filters
-			var sellersFilter []common.Address
-			var tokenIdsFilter []*big.Int
-			var amountsFilter []*big.Int
+			var sellerRule []common.Address
+
+			var tokenIdRule []*big.Int
+
+			var unitsRule []*big.Int
 
 			// Init Observer
-			sub, err := cr.contract.WatchSecondaryForSale(opts, events, sellersFilter, tokenIdsFilter, amountsFilter)
+			sub, err := cr.contract.WatchSecondaryForSale(opts, events, sellerRule, tokenIdRule, unitsRule)
 			if err != nil {
-				log.Printf("Failed to start watching event logs for secundary Sale: %v", err)
+				log.Printf("Failed to start watching event logs: %v", err)
 				time.Sleep(time.Second * 5)
 				continue
 			}
@@ -298,7 +302,7 @@ func (cr *ContractRepository) ListenSecondaryForSale(ctx context.Context) {
 				select {
 				case event := <-events:
 					formattedEvent := formatSecondaryForSaleEvent(event)
-					fmt.Println(formattedEvent)
+					log.Println(formattedEvent)
 
 					tokenID := bigIntToUint64(event.TokenId)
 
@@ -352,6 +356,7 @@ func bigIntToUint64(value *big.Int) uint64 {
 func (cr *ContractRepository) ListenSecondarySold(ctx context.Context) {
 	go func() {
 		for {
+			fmt.Printf("Listening for secundary sold events...\n")
 			currentBlock, err := cr.GetCurrentBlockNumber()
 			if err != nil {
 				log.Printf("Error getting current block number to secundary sold: %v", err)

@@ -269,6 +269,12 @@
         {
           "indexed": true,
           "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
           "name": "_totalValue",
           "type": "uint256"
         },
@@ -279,7 +285,7 @@
           "type": "uint256"
         },
         {
-          "indexed": true,
+          "indexed": false,
           "internalType": "uint256",
           "name": "_duration",
           "type": "uint256"
