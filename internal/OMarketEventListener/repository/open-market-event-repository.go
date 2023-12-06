@@ -197,6 +197,14 @@ func formatBigInt(value *big.Int) string {
 	return value.String()
 }
 
+func formatPriceTwo(price *big.Int) string {
+	// Convertendo o preço para Ether
+	etherValue := new(big.Float).Quo(new(big.Float).SetInt(price), big.NewFloat(1e18))
+
+	// Converte o preço float para uma string formatada
+	return fmt.Sprintf("%.18f", etherValue)
+}
+
 func bigIntToUint64(value *big.Int) uint64 {
 	if value == nil {
 		return 0
@@ -215,14 +223,6 @@ func bigIntToUint64(value *big.Int) uint64 {
  * Listenings events on blockchain
  * ----------------------------------------------------------------------------------------------------
  */
-
-func formatPriceTwo(price *big.Int) string {
-	// Convertendo o preço para Ether
-	etherValue := new(big.Float).Quo(new(big.Float).SetInt(price), big.NewFloat(1e18))
-
-	// Converte o preço float para uma string formatada
-	return fmt.Sprintf("%.18f", etherValue)
-}
 
 func (cr *ContractRepository) ListenToPublicOrderCreated(ctx context.Context) {
 	go func() {
